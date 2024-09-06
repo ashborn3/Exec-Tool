@@ -30,12 +30,11 @@ func main() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		// Process the command (for now, just echo it back and print it to console)
+
 		fmt.Println("Received command:", req.Command)
 
 		cmd := exec.Command(req.Command)
 		output, err := cmd.Output()
-		fmt.Println("Command output:", output)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{"output": err.Error()})
 			return
