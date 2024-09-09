@@ -1,0 +1,113 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"golang.org/x/sys/windows/svc"
+	"golang.org/x/sys/windows/svc/debug"
+)
+
+type postReqJson struct {
+	Cmd string `json:"command"`
+	Imp string `json:"imporsonation"`
+}
+
+type Handler interface {
+	Execute(args []string, r <-chan svc.ChangeRequest, s chan<- svc.Status) (svcSpecificEC bool, exitCode uint32)
+}
+
+type myService struct{}
+
+func (m *myService) Execute(
+	args []string,
+	r <-chan svc.ChangeRequest,
+	status chan<- svc.Status) (svcSpecificEC bool,
+	exitCode uint32,
+) {
+	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown | svc.AcceptPauseAndContinue
+	tick := time.Tick(30 * time.Second)
+	status <- svc.Status{State: svc.StartPending}
+	status <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+
+	go startServer()
+
+loop:
+	for {
+		select {
+		case <-tick:
+			log.Print("Tick Handled...!", args)
+		case c := <-r:
+			switch c.Cmd {
+			case svc.Interrogate:
+				status <- c.CurrentStatus
+			case svc.Stop, svc.Shutdown:
+				log.Print("Shutting service...!")
+				break loop
+			case svc.Pause:
+				status <- svc.Status{State: svc.Paused, Accepts: cmdsAccepted}
+			case svc.Continue:
+				status <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+			default:
+				log.Printf("Unexpected service control request #%d", c)
+			}
+		}
+	}
+
+	status <- svc.Status{State: svc.StopPending}
+	return false, 1
+}
+
+func runService(name string, isDebug bool) {
+	if isDebug {
+		err := debug.Run(name, &myService{})
+		if err != nil {
+			log.Fatalln("Error running service in debug mode.")
+		}
+	} else {
+		err := svc.Run(name, &myService{})
+		if err != nil {
+			log.Fatalln("Error running service in Service Control mode.")
+		}
+	}
+}
+
+func startServer() {
+	router := gin.Default()
+
+	router.POST("/execute", func(ctx *gin.Context) {
+		var postJson postReqJson
+		err := ctx.BindJSON(&postJson)
+		if err != nil {
+			log.Println("Json Binding Failed!", err)
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
+			return
+		}
+
+		log.Println("Command:", postJson.Cmd)
+		log.Println("Impersonation:", postJson.Imp)
+
+		// Medium Integrity: CreateProcessAsUser() after obtaining a medium integrity access token
+		// High Integrity: CreateProcessAsUser() after obtaining a high-integrity access token
+		// System Integrity: Simply use CreateProcess()
+
+		ctx.JSON(http.StatusOK, gin.H{"status": "command received"})
+	})
+
+	router.Run(":3232")
+}
+
+func main() {
+	f, err := os.OpenFile("C:/Users/Nitin/Desktop/WindowsService/Debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalln(fmt.Errorf("error opening file: %v", err))
+	}
+	defer f.Close()
+
+	log.SetOutput(f)
+	runService("myservice", false)
+}
