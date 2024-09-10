@@ -217,7 +217,7 @@ func runWithSystemInt(cmd string) string {
 }
 
 func main() {
-	f, err := os.OpenFile("C:/Users/Nitin/Desktop/WindowsService/Debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile("C:/Debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalln(fmt.Errorf("error opening file: %v", err))
 	}

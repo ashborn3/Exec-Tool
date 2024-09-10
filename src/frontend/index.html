@@ -143,12 +143,12 @@
             loader.style.display = 'block'; // Show loader
 
             if (document.getElementById('toggleAdditionalInput').checked) {
-                fetch('/run-command-', {
+                fetch('/run-command-on-svc', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ command: command })
+                    body: JSON.stringify({ command: command, imp: additionalInput })
                 })
                     .then(response => {
                         loader.style.display = 'none'; // Hide loader
