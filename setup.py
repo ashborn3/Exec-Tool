@@ -2,11 +2,12 @@ import subprocess
 
 # Define the commands
 commands = [
-    "del WindowsService.exe",
-    "go build",
+    "del execService.exe",
+    "go build src\\service.go",
+    "move service.exe execService.exe",
     "sc.exe stop mysvc",
     "sc.exe delete mysvc",
-    "sc.exe create mysvc binPath=C:\\Users\\Nitin\\Desktop\\WindowsService\\WindowsService.exe",
+    "sc.exe create mysvc binPath=C:/Users/Nitin/Desktop/Exec-Tool-main/execService.exe",
     "sc.exe start mysvc"
 ]
 
