@@ -10,6 +10,7 @@ To build Exec-Tool, follow these steps:
 2. Navigate to the project directory: `cd Exec-Tool`
 3. Build the tool: `go build src/main.go`
 4. Start using Exec-Tool: `./main`
+5. Open `localhost:31337` in your browser
 
 ## Service Installation
 
