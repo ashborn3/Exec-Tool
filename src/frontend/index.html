@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,14 +23,20 @@
             margin-bottom: 10px;
         }
 
+        .form-group-checkbox {
+            display: flex;
+            align-items: center;
+        }
+
         .form-group label {
             display: block;
             font-weight: bold;
             margin-bottom: 5px;
         }
 
-        .form-group input[type="text"] {
-            width: 100%;
+        .form-group input[type="text"],
+        .form-group input[type="checkbox"] {
+            width: 95%;
             padding: 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -44,6 +51,11 @@
             cursor: pointer;
         }
 
+        .form-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+        }
+
         #loader {
             display: none;
             margin-top: 10px;
@@ -56,8 +68,13 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         #output {
@@ -68,8 +85,15 @@
             border-radius: 4px;
             white-space: pre-wrap;
         }
+
+        /* Disabled style for the second input field */
+        #additionalInput[disabled] {
+            background-color: #e0e0e0;
+            color: #a0a0a0;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <form id="commandForm">
@@ -80,42 +104,93 @@
             <div class="form-group">
                 <button type="submit">Run Command</button>
             </div>
+
+
+
+            <div class="form-group">
+                <label for="additionalInput">Additional input:</label>
+                <select id="additionalInput" disabled>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="system">System</option>
+                </select>
+            </div>
+            <div class="form-group form-group-checkbox">
+                <label for="toggleAdditionalInput">Enable: </label>
+                <input type="checkbox" id="toggleAdditionalInput">
+            </div>
         </form>
         <div id="loader"></div>
         <pre id="output"></pre>
     </div>
 
     <script>
-        document.getElementById('commandForm').addEventListener('submit', function(event) {
+        document.getElementById('toggleAdditionalInput').addEventListener('change', function (event) {
+            const additionalInput = document.getElementById('additionalInput');
+            additionalInput.disabled = !event.target.checked;
+        });
+
+
+        document.getElementById('commandForm').addEventListener('submit', function (event) {
             event.preventDefault();
             const command = document.getElementById('command').value;
+            const additionalInput = document.getElementById('additionalInput').value;
             const outputBox = document.getElementById('output');
             const loader = document.getElementById('loader');
-            outputBox.innerText = `Running command: ${command}`;
+            const jsonBody = JSON.stringify({ command: command });
+
+            outputBox.innerText = `Running command: ${command}\nAdditional input: ${additionalInput}`;
             loader.style.display = 'block'; // Show loader
 
-            fetch('/run-command', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ command: command })
-            })
-            .then(response => {
-                loader.style.display = 'none'; // Hide loader
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                outputBox.innerText = `Command output:\n${data.output}`;
-            })
-            .catch(error => {
-                loader.style.display = 'none'; // Hide loader
-                outputBox.innerText = `Error: ${error}`;
-            });
+            if (document.getElementById('toggleAdditionalInput').checked) {
+                fetch('/run-command-', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ command: command })
+                })
+                    .then(response => {
+                        loader.style.display = 'none'; // Hide loader
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        outputBox.innerText = `Command output:\n${data.output}`;
+                    })
+                    .catch(error => {
+                        loader.style.display = 'none'; // Hide loader
+                        outputBox.innerText = `Error: ${error}`;
+                    });
+            } else {
+                fetch('/run-command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ command: command })
+                })
+                    .then(response => {
+                        loader.style.display = 'none'; // Hide loader
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        outputBox.innerText = `Command output:\n${data.output}`;
+                    })
+                    .catch(error => {
+                        loader.style.display = 'none'; // Hide loader
+                        outputBox.innerText = `Error: ${error}`;
+                    });
+            }
+
+
         });
     </script>
 </body>
+
 </html>
